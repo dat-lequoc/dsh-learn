@@ -170,7 +170,7 @@ export function MermaidMarkdown({ text, labels }: { text: string; labels: Markdo
 
   return (
     <div ref={containerRef}>
-      <MarkdownText text={text} labels={labels} variant="compact" />
+      <MarkdownText text={text} labels={labels} />
     </div>
   )
 }
