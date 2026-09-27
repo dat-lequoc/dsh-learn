@@ -10,7 +10,60 @@
  * injected `require` (the browser module table) instead of bundling its own
  * copies.
  */
+import { basename, dirname, resolve as resolvePath } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import type { UserConfig } from 'tsdown'
+import { transform } from 'lightningcss'
+
+/**
+ * CSS Modules support: the client bundle is a single flat CJS script loaded
+ * via `window.__ModuleLoader__.load(...)` (see below) with no separate
+ * asset-serving route, so the generic `@tsdown/css` package (which emits a
+ * standalone `.css` file) does not fit. This mirrors dsh-better-sidebar's
+ * own `makeCssPlugin` (tsdown.config.ts): compile `*.module.css` to a hashed
+ * class map with lightningcss and inject the CSS text as a `<style>` tag at
+ * factory execution — no separate asset, no runtime fetch.
+ */
+const CSS_VIRTUAL_PREFIX = '\0dsh-learn-css:'
+const CSS_VIRTUAL_SUFFIX = '.mjs'
+
+function cssModulesPlugin(): NonNullable<UserConfig['plugins']> {
+  return {
+    name: 'dsh-learn-css-modules',
+    resolveId(source: string, importer: string | undefined) {
+      if (!source.endsWith('.module.css')) return null
+      const abs = importer === undefined ? source : resolvePath(dirname(importer), source)
+      return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+    },
+    async load(virtualId: string) {
+      if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
+      const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+      this.addWatchFile(fileId)
+      const source = await readFile(fileId)
+      const { code, exports: cssExports } = transform({
+        filename: fileId,
+        code: source,
+        cssModules: { pattern: '[hash]_[local]' },
+        minify: true,
+      })
+      const classMap: Record<string, string> = {}
+      for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+      const tagId = `dsh-learn/${basename(fileId)}`
+      return [
+        `const css = ${JSON.stringify(code.toString())};`,
+        `const tagId = ${JSON.stringify(tagId)};`,
+        `if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css=' + JSON.stringify(tagId) + ']') === null) {`,
+        `  const tag = document.createElement('style');`,
+        `  tag.dataset.plugin = 'dsh-learn';`,
+        `  tag.dataset.pluginCss = tagId;`,
+        `  tag.textContent = css;`,
+        `  document.head.appendChild(tag);`,
+        `}`,
+        `export default ${JSON.stringify(classMap)};`,
+      ].join('\n')
+    },
+  }
+}
 
 /** Runtime-provided modules the loader module table answers for every bundle
  *  (the official PLATFORM_MODULES entries this plugin actually touches:
@@ -55,6 +108,7 @@ export default [
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     },
+    plugins: [cssModulesPlugin()],
     outputOptions: {
       entryFileNames: 'client.js',
       banner: () => `window.__ModuleLoader__.load({ id: ${JSON.stringify(PACKAGE_ID)}, factory: (require) => {`,

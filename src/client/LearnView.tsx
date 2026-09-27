@@ -9,12 +9,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionScope, TabComponentProps } from 'dsh-better-sidebar/client/service'
 import { learnApi, LearnApiClientError, type PendingQuizOption, type PendingQuizView } from './api.ts'
 import { usePolling } from './use-polling.ts'
 import { MermaidMarkdown } from './mermaid.tsx'
 import { TRANSCRIPT_MARKDOWN_LABELS } from './markdown-labels.tsx'
 import type { TranscriptRow } from '../transcript.ts'
+import css from './LearnView.module.css'
 
 const STATE_POLL_MS = 2000
 const TRANSCRIPT_POLL_MS = 2000
@@ -22,9 +24,10 @@ const NOTE_STORAGE_PREFIX = 'dsh-learn:note:'
 
 /** One transcript row rendered through the shared markdown+mermaid pipeline. */
 function TranscriptRowView({ row }: { row: TranscriptRow }): ReactNode {
+  const label = row.role === 'user' ? 'You' : row.role === 'assistant' ? 'Assistant' : 'Tool'
   return (
-    <div data-learn-row={row.role}>
-      <div data-learn-row-label>{row.role === 'user' ? 'You' : row.role === 'assistant' ? 'Assistant' : 'Tool'}</div>
+    <div className={row.role === 'user' ? css.rowUser : css.rowOther}>
+      <div className={css.rowLabel}>{label}</div>
       <MermaidMarkdown text={row.text} labels={TRANSCRIPT_MARKDOWN_LABELS} />
     </div>
   )
@@ -46,30 +49,37 @@ function QuizPicker({ quiz, onSubmit }: { quiz: PendingQuizView; onSubmit: (dont
   }, [quiz.multiSelect])
 
   return (
-    <div data-learn-quiz role="group" aria-label="Quiz">
-      <div data-learn-quiz-question>{quiz.question}</div>
-      {quiz.details !== undefined && quiz.details !== '' && <div data-learn-quiz-details>{quiz.details}</div>}
-      <ul data-learn-quiz-options>
+    <div className={css.quiz} role="group" aria-label="Quiz">
+      <div className={css.quizQuestion}>
+        <MermaidMarkdown text={quiz.question} labels={TRANSCRIPT_MARKDOWN_LABELS} />
+      </div>
+      {quiz.details !== undefined && quiz.details !== '' && (
+        <div className={css.quizDetails}>{quiz.details}</div>
+      )}
+      <ul className={css.quizOptions}>
         {quiz.options.map((option: PendingQuizOption) => (
           <li key={option.value}>
             <button
               type="button"
+              className={selected.has(option.value) ? `${css.quizOption} ${css.quizOptionSelected}` : css.quizOption}
               aria-pressed={selected.has(option.value)}
               onClick={() => toggle(option.value)}
             >
-              {option.label}
-              {option.description !== undefined && option.description !== '' && <span data-learn-quiz-option-desc>{option.description}</span>}
+              <span className={css.quizOptionLabel}>{option.label}</span>
+              {option.description !== undefined && option.description !== '' && (
+                <span className={css.quizOptionDesc}>{option.description}</span>
+              )}
             </button>
           </li>
         ))}
       </ul>
-      <div data-learn-quiz-actions>
-        <button type="button" disabled={selected.size === 0} onClick={() => onSubmit(false, [...selected])}>
+      <div className={css.quizActions}>
+        <Button variant="primary" size="sm" disabled={selected.size === 0} onClick={() => onSubmit(false, [...selected])}>
           Submit
-        </button>
-        <button type="button" onClick={() => onSubmit(true, [])}>
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onSubmit(true, [])}>
           I don't know
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -96,7 +106,7 @@ function NoteField({ sessionId }: { sessionId: string }): ReactNode {
   }, [note, storageKey])
 
   return (
-    <div data-learn-note>
+    <div className={css.note}>
       <label htmlFor="dsh-learn-note-field">Notes</label>
       <textarea
         id="dsh-learn-note-field"
@@ -133,7 +143,7 @@ function Composer({ scope, running, onSend, onInterrupt }: {
 
   return (
     <form
-      data-learn-composer
+      className={css.composer}
       onSubmit={(event) => { event.preventDefault(); void submit() }}
     >
       <textarea
@@ -149,13 +159,13 @@ function Composer({ scope, running, onSend, onInterrupt }: {
         rows={2}
         aria-label="Message"
       />
-      <div data-learn-composer-actions>
-        <button type="submit" disabled={sending || text.trim() === ''}>
+      <div className={css.composerActions}>
+        <Button type="submit" variant="primary" size="sm" disabled={sending || text.trim() === ''}>
           {running ? 'Steer' : 'Send'}
-        </button>
-        <button type="button" disabled={!running} onClick={() => { void onInterrupt() }}>
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={!running} onClick={() => { void onInterrupt() }}>
           Stop
-        </button>
+        </Button>
       </div>
     </form>
   )
@@ -225,7 +235,7 @@ export function LearnView({ scope, visible }: TabComponentProps): ReactNode {
 
   if (!active) {
     return (
-      <div data-learn-tab data-learn-inactive>
+      <div className={css.inactive}>
         <p>Guided learning mode is off for this session.</p>
         <p>Run <code>/learn</code> (optionally with a topic) in the chat to turn it on.</p>
       </div>
@@ -233,12 +243,12 @@ export function LearnView({ scope, visible }: TabComponentProps): ReactNode {
   }
 
   return (
-    <div data-learn-tab>
-      <header data-learn-header>
+    <div className={css.tab}>
+      <header className={css.header}>
         <span>Learning{topic !== undefined ? `: ${topic}` : ''}</span>
       </header>
-      {error !== null && <div role="alert" data-learn-error>{error}</div>}
-      <div data-learn-transcript>
+      {error !== null && <div role="alert" className={css.error}>{error}</div>}
+      <div className={css.transcript}>
         {rows.map(row => <TranscriptRowView key={row.seq} row={row} />)}
         <div ref={transcriptEndRef} />
       </div>

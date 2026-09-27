@@ -1,0 +1,226 @@
+/* Learn tab: transcript (markdown + mermaid), a live quiz picker, a note
+ * scratchpad, and a compact composer. Visual language mirrors
+ * dsh-better-sidebar's own Side Chat tab (full-width assistant markdown,
+ * right-aligned user bubbles, a capsule composer) so the Learn tab reads as
+ * a native part of the same sidebar rather than a bolted-on plugin surface.
+ * All values consume the --dsw-alias- and --dsw-font- token families; no
+ * hardcoded colors. */
+
+.tab {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.inactive {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 20px;
+  text-align: center;
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.inactive code {
+  font-family: var(--dsw-font-mono);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.header {
+  flex: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dsw-alias-hairline);
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+}
+
+.error {
+  flex: none;
+  padding: 6px 12px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-danger);
+}
+
+/* ── transcript ─────────────────────────────────────────────────────── */
+.transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rowLabel {
+  font: var(--dsw-font-xxs-strong-12);
+  color: var(--dsw-alias-label-tertiary);
+  margin-bottom: 2px;
+}
+
+.rowUser {
+  align-self: flex-end;
+  max-width: 92%;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--dsw-specific-bubble, var(--dsw-alias-bg-layer-2));
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-primary);
+  overflow-wrap: anywhere;
+}
+
+.rowUser .rowLabel {
+  text-align: right;
+}
+
+.rowOther {
+  align-self: stretch;
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-primary);
+  overflow-wrap: anywhere;
+}
+
+/* ── quiz picker ────────────────────────────────────────────────────── */
+.quiz {
+  flex: none;
+  margin: 0 12px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quizQuestion {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+}
+
+.quizDetails {
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.quizOptions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quizOption {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-s-14);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 100ms ease-out, border-color 100ms ease-out;
+}
+
+.quizOption:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.quizOptionSelected {
+  border-color: color-mix(in srgb, var(--dsw-alias-accent) 45%, transparent);
+  background: var(--dsw-alias-accent-soft, var(--dsw-alias-bg-layer-2));
+}
+
+.quizOptionLabel {
+  font: var(--dsw-font-s-14);
+}
+
+.quizOptionDesc {
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.quizActions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── notes ──────────────────────────────────────────────────────────── */
+.note {
+  flex: none;
+  margin: 0 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.note label {
+  font: var(--dsw-font-xxs-strong-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.note textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-s-14);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.note textarea::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* ── composer ───────────────────────────────────────────────────────── */
+.composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 12px 12px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: var(--dsw-specific-input-major, var(--dsw-alias-bg-base));
+}
+
+.composer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-s-14);
+  line-height: 22px;
+  outline: none;
+  resize: none;
+  max-height: 132px;
+}
+
+.composer textarea::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.composerActions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

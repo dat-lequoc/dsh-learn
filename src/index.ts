@@ -1,11 +1,15 @@
 /**
  * dsh-learn host half: a per-session, off-by-default guided-teaching mode.
- * Mirrors @deepseek-ai/dsh-plan-mode's architecture (logged event + session
- * projection, a slash command, a conditional system-prompt section, an
- * always-registered self-guarding tool) for a teaching workflow instead of a
- * planning one:
+ * Loosely mirrors @deepseek-ai/dsh-plan-mode's architecture (a slash
+ * command, a conditional system-prompt section, an always-registered
+ * self-guarding tool) for a teaching workflow instead of a planning one:
  *
- * - `/learn [off|topic]` turns guided learning on/off for the current session only.
+ * - `/learn [off|topic]` turns guided learning on/off for the current
+ *   session only. Kept in memory only (not logged to the session's event
+ *   log): DSH's public `Session.append()` API has no way to mark a custom
+ *   event type `ignorable`, and an unrecognized non-ignorable event type
+ *   permanently breaks that session's history after a host restart. See
+ *   {@link LearnController.unit}.
  * - `learn:policy` prompt section (only rendered while active) carries the
  *   teaching method ported from pi-learn's `learn/skills/teach/SKILL.md`.
  * - `quiz` tool poses a graded multiple-choice check, blocking until the
@@ -26,15 +30,11 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import type {} from '@deepseek-ai/dsh-session-projection'
-import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 // Type-only: pulls in these packages' own `declare module '@deepseek-ai/cordis'`
 // augmentations (ctx.commands, ctx.webServer) without a runtime import.
 import type {} from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { z as zod } from 'zod'
-import type { ZodType } from 'zod'
-import type { LearnProjection, LearnUnitState } from './types.ts'
+import type { LearnUnitState } from './types.ts'
 import { isCorrectSelection, normalizeOptions, resolveCorrectIndices, shuffleOptions } from './quiz.ts'
 import type { QuizOption } from './quiz.ts'
 import { transcriptRows, type TranscriptRow } from './transcript.ts'
@@ -129,48 +129,17 @@ interface QuizSubmission {
   readonly selectedValues: readonly string[]
 }
 
-const learnUnitStateSchema: ZodType<LearnUnitState> = zod.object({
-  active: zod.boolean(),
-  topic: zod.string().optional(),
-}).strict()
-
-const learnProjectionSchema: ZodType<LearnProjection> = zod.object({
-  active: zod.boolean(),
-  topic: zod.string().optional(),
-})
-
 /**
- * Build a {@link LearnUnitState} (or {@link LearnProjection}) whose optional
- * `topic` key is omitted rather than present-with-`undefined`: the session
- * projection's state is forwarded as a Cordis event argument to Remote
- * clients, which requires every value to be lossless JSON
- * ({@link https://github.com/deepseek-ai/dsh `isJsonValue`} treats a
- * present `undefined`-valued key as JSON-unsafe, unlike `JSON.stringify`).
+ * Build a {@link LearnUnitState} whose optional `topic` key is omitted
+ * rather than present-with-`undefined`, matching the wire/JSON contract
+ * used everywhere else this state is read.
  * @param active - whether guided learning is active.
  * @param topic - the learner-given topic; omitted when absent or inactive.
  * @returns a state object with `topic` present only when defined.
  */
-function learnState(active: boolean, topic: string | undefined): LearnUnitState {
+export function learnState(active: boolean, topic: string | undefined): LearnUnitState {
   return topic === undefined ? { active } : { active, topic }
 }
-
-/** Projection of the logged `learn/mode` selections: whether guided learning is active, and its topic. */
-export const learnProjectionDefinition = {
-  key: 'learn',
-  stateVersion: 1,
-  stateSchema: learnUnitStateSchema,
-  init: () => learnState(false, undefined),
-  apply: (state, event) => {
-    if (event.type === 'learn/mode') {
-      return learnState(event.data.active, event.data.active ? event.data.topic : undefined)
-    }
-    return state
-  },
-  wire: {
-    viewSchema: learnProjectionSchema,
-    view: state => learnState(state.active, state.topic),
-  },
-} satisfies ProjectionDefinition<'learn', LearnUnitState>
 
 /**
  * `ctx.learn`: owns logged learn-mode state, the `/learn` command, the
@@ -178,10 +147,21 @@ export const learnProjectionDefinition = {
  * the Learn sidebar tab's routes read and resolve.
  */
 export class LearnController extends Service {
-  static inject = ['tools', 'systemPrompt', 'sessionProjections', 'webServer', 'webRuntime']
+  static inject = ['tools', 'systemPrompt', 'webServer', 'webRuntime']
 
   private readonly section: string
   private readonly pending = new Map<string, PendingQuiz>()
+  /**
+   * Per-session active/topic state, in memory only. Deliberately not logged
+   * to the session's event log: DSH's public `Session.append()` API has no
+   * way to mark a custom event type `ignorable`, so a logged `learn/mode`
+   * event permanently breaks that session's history after any host restart
+   * (`dsh-session-persistence` refuses to reload a log containing an
+   * unrecognized, non-ignorable event type). Same durability class as
+   * {@link pending}: cleared on restart, which only means `/learn` reverts
+   * to off — an acceptable tradeoff for this off-by-default dev feature.
+   */
+  private readonly unit = new Map<string, LearnUnitState>()
 
   constructor(ctx: Context, config: LearnModeConfig = { section: '' }) {
     super(ctx, 'learn')
@@ -200,8 +180,6 @@ export class LearnController extends Service {
         return this.loggedActive(context.agent.session) ? this.section : ''
       },
     })
-
-    ctx.sessionProjections.register(learnProjectionDefinition)
 
     // The model reliably ignores the `learn:policy` guidance to prefer `quiz`
     // over `ask_user_question` for comprehension checks (observed live: it
@@ -417,7 +395,7 @@ export class LearnController extends Service {
   /** Learn mode state and agent status for the Learn tab header and composer. */
   private stateView(sessionId: string): { active: boolean; topic: string | undefined; running: boolean } {
     const agent = this.requireAgent(sessionId)
-    const learn = this.ctx.sessionProjections.stateOf(agent.session, 'learn')
+    const learn = this.unit.get(String(agent.session.id))
     return { active: learn?.active ?? false, topic: learn?.topic, running: agent.status === 'running' }
   }
 
@@ -467,14 +445,12 @@ export class LearnController extends Service {
   }
 
   private loggedActive(session: Session): boolean {
-    const state = this.ctx.sessionProjections.stateOf(session, 'learn')
-    if (state === undefined) throw new Error('dsh-learn requires the learn session projection')
-    return state.active
+    return this.unit.get(String(session.id))?.active ?? false
   }
 
-  /** Select whether learn mode should be active for a session; appended immediately (log-only, non-surface). */
+  /** Select whether learn mode should be active for a session; kept in memory only (see {@link unit}). */
   private set(session: Session, active: boolean, topic?: string): void {
-    session.append('learn/mode', topic === undefined ? { active } : { active, topic })
+    this.unit.set(String(session.id), learnState(active, topic))
   }
 }
 
