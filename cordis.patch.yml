@@ -1,0 +1,9 @@
+# dsh-learn bundle patch: mounts the host half as one Loader entry.
+#
+# The plugin is off by default in every session: `/learn` (or `/learn topic`)
+# turns it on for that session only, mirroring dsh-plan-mode's per-session
+# `plan/mode` event. Nothing here runs unless a session explicitly opts in.
+- insert:
+    - id: learn
+      name: 'dsh-learn'
+      config: {}
