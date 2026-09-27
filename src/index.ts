@@ -66,6 +66,9 @@ declare module '@deepseek-ai/cordis' {
 /** The model-facing quiz tool's name. */
 export const QUIZ_TOOL = 'quiz'
 
+/** The built-in `@deepseek-ai/dsh-tool-ask-user` tool's name, guarded off while learn mode is active. */
+const ASK_USER_QUESTION = 'ask_user_question'
+
 /** Deployment-owned teaching guidance rendered as the `learn:policy` prompt section while active. */
 export interface LearnModeConfig {
   section: string
@@ -136,21 +139,36 @@ const learnProjectionSchema: ZodType<LearnProjection> = zod.object({
   topic: zod.string().optional(),
 })
 
+/**
+ * Build a {@link LearnUnitState} (or {@link LearnProjection}) whose optional
+ * `topic` key is omitted rather than present-with-`undefined`: the session
+ * projection's state is forwarded as a Cordis event argument to Remote
+ * clients, which requires every value to be lossless JSON
+ * ({@link https://github.com/deepseek-ai/dsh `isJsonValue`} treats a
+ * present `undefined`-valued key as JSON-unsafe, unlike `JSON.stringify`).
+ * @param active - whether guided learning is active.
+ * @param topic - the learner-given topic; omitted when absent or inactive.
+ * @returns a state object with `topic` present only when defined.
+ */
+function learnState(active: boolean, topic: string | undefined): LearnUnitState {
+  return topic === undefined ? { active } : { active, topic }
+}
+
 /** Projection of the logged `learn/mode` selections: whether guided learning is active, and its topic. */
 export const learnProjectionDefinition = {
   key: 'learn',
   stateVersion: 1,
   stateSchema: learnUnitStateSchema,
-  init: () => ({ active: false, topic: undefined }),
+  init: () => learnState(false, undefined),
   apply: (state, event) => {
     if (event.type === 'learn/mode') {
-      return { active: event.data.active, topic: event.data.active ? event.data.topic : undefined }
+      return learnState(event.data.active, event.data.active ? event.data.topic : undefined)
     }
     return state
   },
   wire: {
     viewSchema: learnProjectionSchema,
-    view: state => ({ active: state.active, topic: state.topic }),
+    view: state => learnState(state.active, state.topic),
   },
 } satisfies ProjectionDefinition<'learn', LearnUnitState>
 
@@ -184,6 +202,21 @@ export class LearnController extends Service {
     })
 
     ctx.sessionProjections.register(learnProjectionDefinition)
+
+    // The model reliably ignores the `learn:policy` guidance to prefer `quiz`
+    // over `ask_user_question` for comprehension checks (observed live: it
+    // called `ask_user_question` for a calibration question), leaving
+    // `dsh-learn`'s pending-quiz bridge — and so the dedicated Learn tab —
+    // empty. A guard is a harder backstop than prose: deny the built-in tool
+    // outright while learn mode is active for that agent's session, with a
+    // denial reason that redirects to `quiz`; a no-op when `dsh-tool-ask-user`
+    // isn't installed, since the guard only fires on a call to that name.
+    ctx.tools.guard((exec) => {
+      if (exec.name !== ASK_USER_QUESTION) return undefined
+      if (exec.agent === undefined || !this.loggedActive(exec.agent.session)) return undefined
+      return `${ASK_USER_QUESTION} is disabled in guided learning mode; use \`${QUIZ_TOOL}\` for comprehension `
+        + 'checks instead, or state the question in your reply for anything else.'
+    })
 
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({

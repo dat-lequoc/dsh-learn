@@ -9,7 +9,13 @@ function event(type: string, data: unknown): { type: string; data: unknown } {
 
 describe('learnProjectionDefinition', () => {
   it('starts inactive with no topic', () => {
-    expect(learnProjectionDefinition.init()).toEqual({ active: false, topic: undefined })
+    const state = learnProjectionDefinition.init()
+    expect(state).toEqual({ active: false, topic: undefined })
+    // The `topic` key must be *absent*, not present-with-`undefined`: this state is
+    // forwarded as a Cordis event argument to Remote clients, whose lossless-JSON
+    // check (`isJsonValue`) rejects a present `undefined`-valued key even though
+    // `toEqual`/`JSON.stringify` treat it the same as an absent one.
+    expect(Object.keys(state)).not.toContain('topic')
   })
 
   it('turns on and carries the topic', () => {
@@ -24,6 +30,7 @@ describe('learnProjectionDefinition', () => {
     const active: LearnUnitState = { active: true, topic: 'closures' }
     const state = learnProjectionDefinition.apply(active, event('learn/mode', { active: false }) as never)
     expect(state).toEqual({ active: false, topic: undefined })
+    expect(Object.keys(state)).not.toContain('topic')
   })
 
   it('ignores unrelated event types (same-reference passthrough)', () => {
