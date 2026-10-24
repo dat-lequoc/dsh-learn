@@ -28,14 +28,30 @@ import { splitMermaidBlocks } from './mermaid-blocks.ts'
 /** Monotonic id seed: every render call gets a fresh, document-unique id. */
 let mermaidSeq = 0
 
-/** Configure mermaid (idempotent; static light theme — no dark/light sync in v0.1). */
-function configureMermaid(): void {
+/** Whether the host shell resolved to the dark color scheme. */
+function isDarkScheme(): boolean {
+  if (typeof document === 'undefined') return false
+  const decided = document.documentElement.style.colorScheme !== ''
+  if (decided) return document.body.hasAttribute('data-ds-dark-theme')
+  return typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+/** Subscribe to dark/light theme flips on `document.body`. */
+function subscribeColorScheme(callback: () => void): () => void {
+  if (typeof document === 'undefined') return () => {}
+  const observer = new MutationObserver(() => { callback() })
+  observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
+  return () => { observer.disconnect() }
+}
+
+/** Configure mermaid for the active color scheme. */
+function configureMermaid(dark: boolean): void {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
     htmlLabels: false,
     suppressErrorRendering: true,
-    theme: 'default',
+    theme: dark ? 'dark' : 'default',
   })
 }
 
@@ -49,13 +65,16 @@ function summarizeError(error: unknown): string {
 function MermaidDiagram({ code }: { code: string }): ReactNode {
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [dark, setDark] = useState<boolean>(() => isDarkScheme())
+
+  useEffect(() => subscribeColorScheme(() => { setDark(isDarkScheme()) }), [])
 
   useEffect(() => {
     let cancelled = false
     setSvg(null)
     setError(null)
     if (code.trim() === '') return () => { cancelled = true }
-    configureMermaid()
+    configureMermaid(dark)
     const id = `dsh-learn-mermaid-${mermaidSeq += 1}`
     mermaid.render(id, code)
       .then(({ svg: rendered }) => {
@@ -72,7 +91,7 @@ function MermaidDiagram({ code }: { code: string }): ReactNode {
         setError(summarizeError(reason))
       })
     return () => { cancelled = true }
-  }, [code])
+  }, [code, dark])
 
   return (
     <div>

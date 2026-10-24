@@ -44,26 +44,20 @@ async function call<T>(method: string, payload: Record<string, unknown>, signal?
   return readEnvelope<T>(response)
 }
 
-/** Learn mode state and agent status for the tab header and composer. */
+/** Learn mode state and agent status for the tab header and steering composer. */
 export interface LearnStateView {
   active: boolean
   topic: string | undefined
   running: boolean
 }
 
-/** One learner-facing option of a pending quiz. */
-export interface PendingQuizOption {
-  label: string
-  value: string
-  description: string | undefined
-}
-
-/** The quiz currently waiting on the learner's pick, or `null` when none is pending. */
+/**
+ * The quiz currently waiting on the learner: which transcript row it is, and
+ * its options in graded display order. `null` when none is pending.
+ */
 export interface PendingQuizView {
-  question: string
-  details: string | undefined
-  multiSelect: boolean
-  options: PendingQuizOption[]
+  callId: string
+  options: { label: string; value: string; description?: string }[]
 }
 
 /** The Learn `/learn/api` client surface (session id threaded through every call). */
@@ -71,11 +65,13 @@ export const learnApi = {
   state: (sessionId: string, signal?: AbortSignal) =>
     call<LearnStateView>('state', { sessionId }, signal),
   transcript: (sessionId: string, signal?: AbortSignal) =>
-    call<{ rows: TranscriptRow[] }>('transcript', { sessionId }, signal),
+    call<{ rows: TranscriptRow[]; streamingText?: string }>('transcript', { sessionId }, signal),
   pendingQuiz: (sessionId: string, signal?: AbortSignal) =>
     call<PendingQuizView | null>('pending-quiz', { sessionId }, signal),
-  submitAnswer: (sessionId: string, dontKnow: boolean, selectedValues: readonly string[]) =>
-    call<{ ok: true }>('submit-answer', { sessionId, dontKnow, selectedValues }),
+  submitAnswer: (sessionId: string, callId: string, dontKnow: boolean, selectedValues: readonly string[]) =>
+    call<{ ok: true }>('submit-answer', { sessionId, callId, dontKnow, selectedValues }),
+  toggle: (sessionId: string, active: boolean, topic?: string) =>
+    call<{ ok: true }>('toggle', { sessionId, active, ...topic === undefined ? {} : { topic } }),
   send: (sessionId: string, text: string) =>
     call<{ ok: true }>('send', { sessionId, text }),
   interrupt: (sessionId: string) =>

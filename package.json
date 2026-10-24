@@ -1,6 +1,6 @@
 {
   "name": "dsh-learn",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Guided teaching mode for DeepSeek Harness: /learn, a graded quiz tool, and a dedicated Learn tab in dsh-better-sidebar.",
   "type": "module",
   "license": "MIT",
@@ -17,12 +17,16 @@
     },
     "./client": "./lib/client.js",
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
+  "icon": "./icon.svg",
   "files": [
     "lib/**/*.js",
     "lib/types/**/*.d.ts",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json --emitDeclarationOnly --outDir lib/types && tsdown",
@@ -42,14 +46,14 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-agent": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-commands": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-llm": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-session": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-tools": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-agent": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-commands": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-session": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.1",
     "dsh-better-sidebar": ">=0.19.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -64,14 +68,14 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-agent": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-commands": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-llm": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-session": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.1",
-    "@deepseek-ai/dsh-tools": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-agent": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-commands": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
     "@types/node": "^22.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
